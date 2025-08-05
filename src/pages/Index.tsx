@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Truck, LogOut, Home, Menu, X, Package, BarChart, PlusCircle, FileText } from 'lucide-react';
+import { Truck, LogOut, Home, Menu, X, Package, BarChart, PlusCircle, FileText, MapPin } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import GoogleMap from "@/components/GoogleMap";
 
 // --- Components ---
 
@@ -88,9 +89,21 @@ const Dashboard = ({ userId }: { userId: string }) => {
 
 const Shipments = ({ userId }: { userId: string }) => {
   const [shipments, setShipments] = useState<any[]>([]);
-  const [newShipment, setNewShipment] = useState({ origin: '', destination: '', eta: '', status: 'Pending', type: '' });
+  const [newShipment, setNewShipment] = useState({ 
+    origin: '', 
+    destination: '', 
+    eta: '', 
+    status: 'Pending', 
+    type: '',
+    originLat: null as number | null,
+    originLng: null as number | null,
+    destinationLat: null as number | null,
+    destinationLng: null as number | null
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showMap, setShowMap] = useState(false);
+  const [mapMode, setMapMode] = useState<'origin' | 'destination' | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -102,6 +115,35 @@ const Shipments = ({ userId }: { userId: string }) => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setNewShipment({ ...newShipment, [name]: value });
+  };
+
+  const handleMapClick = (lat: number, lng: number) => {
+    if (mapMode === 'origin') {
+      setNewShipment({ 
+        ...newShipment, 
+        originLat: lat, 
+        originLng: lng,
+        origin: `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+      });
+    } else if (mapMode === 'destination') {
+      setNewShipment({ 
+        ...newShipment, 
+        destinationLat: lat, 
+        destinationLng: lng,
+        destination: `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+      });
+    }
+    setShowMap(false);
+    setMapMode(null);
+    toast({
+      title: "Location Set",
+      description: `${mapMode === 'origin' ? 'Origin' : 'Destination'} coordinates updated`
+    });
+  };
+
+  const openMapForLocation = (type: 'origin' | 'destination') => {
+    setMapMode(type);
+    setShowMap(true);
   };
 
   const handleAddShipment = async (e: React.FormEvent) => {
@@ -116,17 +158,89 @@ const Shipments = ({ userId }: { userId: string }) => {
     }
     
     // Placeholder for future database implementation
+    const shipmentData = {
+      ...newShipment,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString()
+    };
+    
+    setShipments([...shipments, shipmentData]);
+    setNewShipment({ 
+      origin: '', 
+      destination: '', 
+      eta: '', 
+      status: 'Pending', 
+      type: '',
+      originLat: null,
+      originLng: null,
+      destinationLat: null,
+      destinationLng: null
+    });
+    
     toast({
-      title: "Info",
-      description: "Database tables will be created when you're ready to store data.",
+      title: "Success",
+      description: "Shipment added successfully! (Demo mode - database tables needed for persistence)",
     });
   };
+
+  // Create markers for the map
+  const mapMarkers = shipments.reduce((markers: any[], shipment) => {
+    if (shipment.originLat && shipment.originLng) {
+      markers.push({
+        lat: shipment.originLat,
+        lng: shipment.originLng,
+        title: `Origin: ${shipment.origin}`,
+        info: `Shipment Type: ${shipment.type}\nStatus: ${shipment.status}`
+      });
+    }
+    if (shipment.destinationLat && shipment.destinationLng) {
+      markers.push({
+        lat: shipment.destinationLat,
+        lng: shipment.destinationLng,
+        title: `Destination: ${shipment.destination}`,
+        info: `Shipment Type: ${shipment.type}\nETA: ${shipment.eta}`
+      });
+    }
+    return markers;
+  }, []);
 
   if (loading) return <LoadingSpinner />;
   if (error) return <div className="text-destructive p-4 text-center">{error}</div>;
 
   return (
     <div className="p-6 bg-background min-h-screen">
+      {/* Map Modal */}
+      {showMap && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+          <div className="bg-card rounded-lg shadow-elegant p-6 max-w-4xl w-full max-h-[80vh] border">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-card-foreground">
+                Select {mapMode === 'origin' ? 'Origin' : 'Destination'} Location
+              </h3>
+              <Button
+                onClick={() => {
+                  setShowMap(false);
+                  setMapMode(null);
+                }}
+                variant="ghost"
+                size="icon"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <p className="text-muted-foreground mb-4">
+              Click on the map to set the {mapMode === 'origin' ? 'origin' : 'destination'} coordinates
+            </p>
+            <GoogleMap
+              height="500px"
+              onMapClick={handleMapClick}
+              center={{ lat: 39.8283, lng: -98.5795 }}
+              zoom={4}
+            />
+          </div>
+        </div>
+      )}
+
       <h1 className="text-3xl font-bold text-foreground mb-8 rounded-md p-4 bg-card shadow-card border">Shipment Management</h1>
 
       {/* Add New Shipment Form */}
@@ -135,29 +249,49 @@ const Shipments = ({ userId }: { userId: string }) => {
         <form onSubmit={handleAddShipment} className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label htmlFor="origin" className="block text-sm font-medium text-card-foreground mb-1">Origin</label>
-            <input
-              type="text"
-              id="origin"
-              name="origin"
-              value={newShipment.origin}
-              onChange={handleInputChange}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
-              placeholder="Farm A"
-              required
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                id="origin"
+                name="origin"
+                value={newShipment.origin}
+                onChange={handleInputChange}
+                className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                placeholder="Farm A or coordinates"
+                required
+              />
+              <Button
+                type="button"
+                onClick={() => openMapForLocation('origin')}
+                variant="outline"
+                size="icon"
+              >
+                <MapPin className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
           <div>
             <label htmlFor="destination" className="block text-sm font-medium text-card-foreground mb-1">Destination</label>
-            <input
-              type="text"
-              id="destination"
-              name="destination"
-              value={newShipment.destination}
-              onChange={handleInputChange}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
-              placeholder="Processing Plant B"
-              required
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                id="destination"
+                name="destination"
+                value={newShipment.destination}
+                onChange={handleInputChange}
+                className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                placeholder="Processing Plant B or coordinates"
+                required
+              />
+              <Button
+                type="button"
+                onClick={() => openMapForLocation('destination')}
+                variant="outline"
+                size="icon"
+              >
+                <MapPin className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
           <div>
             <label htmlFor="eta" className="block text-sm font-medium text-card-foreground mb-1">ETA</label>
@@ -194,10 +328,68 @@ const Shipments = ({ userId }: { userId: string }) => {
         </form>
       </div>
 
+      {/* Tracking Map */}
+      <div className="bg-card p-6 rounded-lg shadow-card border mb-8">
+        <h2 className="text-xl font-semibold text-card-foreground mb-4">Shipment Tracking Map</h2>
+        <GoogleMap
+          height="400px"
+          markers={mapMarkers}
+          center={{ lat: 39.8283, lng: -98.5795 }}
+          zoom={4}
+        />
+      </div>
+
       {/* Current Shipments Table */}
       <div className="bg-card p-6 rounded-lg shadow-card border">
         <h2 className="text-xl font-semibold text-card-foreground mb-4">Current Shipments</h2>
-        <p className="text-muted-foreground">No shipments recorded yet. Create database tables to start tracking shipments.</p>
+        {shipments.length === 0 ? (
+          <p className="text-muted-foreground">No shipments recorded yet. Add a shipment to see it on the map.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-border">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Origin</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Destination</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Type</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">ETA</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-card divide-y divide-border">
+                {shipments.map((shipment) => (
+                  <tr key={shipment.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-card-foreground">{shipment.id.substring(0, 8)}...</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{shipment.origin}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{shipment.destination}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{shipment.type}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{shipment.eta}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        shipment.status === 'In Transit' ? 'bg-warning-light text-warning-foreground' :
+                        shipment.status === 'Delivered' ? 'bg-success-light text-success-foreground' :
+                        'bg-muted text-muted-foreground'
+                      }`}>
+                        {shipment.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <Button
+                        onClick={() => setShipments(shipments.filter(s => s.id !== shipment.id))}
+                        variant="destructive"
+                        size="sm"
+                      >
+                        Delete
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
