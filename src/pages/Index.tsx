@@ -183,7 +183,20 @@ const Shipments = ({ userId }: { userId: string }) => {
     });
   };
 
-  // Create markers for the map
+  // Create routes and markers for the map
+  const mapRoutes = shipments.reduce((routes: any[], shipment) => {
+    if (shipment.originLat && shipment.originLng && shipment.destinationLat && shipment.destinationLng) {
+      routes.push({
+        origin: { lat: shipment.originLat, lng: shipment.originLng },
+        destination: { lat: shipment.destinationLat, lng: shipment.destinationLng },
+        title: `${shipment.type} - ${shipment.status}`,
+        color: shipment.status === 'In Transit' ? '#f59e0b' : 
+               shipment.status === 'Delivered' ? '#10b981' : '#6366f1'
+      });
+    }
+    return routes;
+  }, []);
+
   const mapMarkers = shipments.reduce((markers: any[], shipment) => {
     if (shipment.originLat && shipment.originLng) {
       markers.push({
@@ -334,6 +347,7 @@ const Shipments = ({ userId }: { userId: string }) => {
         <GoogleMap
           height="400px"
           markers={mapMarkers}
+          routes={mapRoutes}
           center={{ lat: 39.8283, lng: -98.5795 }}
           zoom={4}
         />

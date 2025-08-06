@@ -12,6 +12,12 @@ interface MapProps {
     title: string;
     info?: string;
   }>;
+  routes?: Array<{
+    origin: { lat: number; lng: number };
+    destination: { lat: number; lng: number };
+    title: string;
+    color?: string;
+  }>;
   center?: { lat: number; lng: number };
   zoom?: number;
   onMapClick?: (lat: number, lng: number) => void;
@@ -21,6 +27,7 @@ interface MapProps {
 const GoogleMap: React.FC<MapProps> = ({
   height = '400px',
   markers = [],
+  routes = [],
   center = { lat: 39.8283, lng: -98.5795 }, // Center of USA
   zoom = 4,
   onMapClick,
@@ -28,6 +35,8 @@ const GoogleMap: React.FC<MapProps> = ({
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [directionsService, setDirectionsService] = useState<google.maps.DirectionsService | null>(null);
+  const [directionsRenderers, setDirectionsRenderers] = useState<google.maps.DirectionsRenderer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,6 +74,10 @@ const GoogleMap: React.FC<MapProps> = ({
 
         setMap(mapInstance);
 
+        // Initialize directions service
+        const directionsServiceInstance = new google.maps.DirectionsService();
+        setDirectionsService(directionsServiceInstance);
+
         // Add click listener if provided
         if (onMapClick) {
           mapInstance.addListener('click', (event: google.maps.MapMouseEvent) => {
@@ -84,6 +97,51 @@ const GoogleMap: React.FC<MapProps> = ({
 
     initializeMap();
   }, [center.lat, center.lng, zoom, onMapClick]);
+
+  // Update routes when routes prop changes
+  useEffect(() => {
+    if (!map || !directionsService || typeof google === 'undefined') return;
+
+    // Clear existing route renderers
+    directionsRenderers.forEach(renderer => {
+      renderer.setMap(null);
+    });
+
+    const newRenderers: google.maps.DirectionsRenderer[] = [];
+
+    // Create new routes
+    routes.forEach((route, index) => {
+      const directionsRenderer = new google.maps.DirectionsRenderer({
+        suppressMarkers: false, // Show start/end markers
+        polylineOptions: {
+          strokeColor: route.color || '#4285F4',
+          strokeWeight: 4,
+          strokeOpacity: 0.8,
+        },
+      });
+
+      directionsRenderer.setMap(map);
+      newRenderers.push(directionsRenderer);
+
+      // Calculate and display route
+      directionsService.route(
+        {
+          origin: route.origin,
+          destination: route.destination,
+          travelMode: google.maps.TravelMode.DRIVING,
+        },
+        (result, status) => {
+          if (status === google.maps.DirectionsStatus.OK && result) {
+            directionsRenderer.setDirections(result);
+          } else {
+            console.error('Directions request failed due to ' + status);
+          }
+        }
+      );
+    });
+
+    setDirectionsRenderers(newRenderers);
+  }, [map, directionsService, routes]);
 
   // Update markers when markers prop changes
   useEffect(() => {
