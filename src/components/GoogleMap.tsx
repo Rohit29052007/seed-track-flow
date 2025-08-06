@@ -145,13 +145,18 @@ const GoogleMap: React.FC<MapProps> = ({
 
   // Update markers when markers prop changes
   useEffect(() => {
-    if (!map || typeof google === 'undefined') return;
+    console.log('GoogleMap markers effect called with:', markers);
+    if (!map || typeof google === 'undefined') {
+      console.log('Map not ready yet or google undefined');
+      return;
+    }
 
     // Clear existing markers
     // Note: In a real app, you'd want to keep track of markers to remove them properly
     
     // Add new markers
-    markers.forEach(marker => {
+    markers.forEach((marker, index) => {
+      console.log(`Creating marker ${index}:`, marker);
       const mapMarker = new google.maps.Marker({
         position: { lat: marker.lat, lng: marker.lng },
         map,
