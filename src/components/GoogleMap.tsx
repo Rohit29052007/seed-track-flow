@@ -43,16 +43,23 @@ const GoogleMap: React.FC<MapProps> = ({
   useEffect(() => {
     const initializeMap = async () => {
       try {
+        console.log('Starting map initialization...');
+        
         // Get Google Maps API key from Supabase Edge Function
+        console.log('Fetching Google Maps API key...');
         const { data, error } = await supabase.functions.invoke('get-google-maps-key');
         
         if (error) {
+          console.error('Supabase function error:', error);
           throw new Error('Failed to get Google Maps API key');
         }
 
         if (!data?.apiKey) {
+          console.error('No API key in response:', data);
           throw new Error('Google Maps API key not configured');
         }
+
+        console.log('API key retrieved successfully, loading Google Maps...');
 
         const loader = new Loader({
           apiKey: data.apiKey,
@@ -61,9 +68,14 @@ const GoogleMap: React.FC<MapProps> = ({
         });
 
         const google = await loader.load();
+        console.log('Google Maps API loaded successfully');
         
-        if (!mapRef.current) return;
+        if (!mapRef.current) {
+          console.error('Map ref is null');
+          return;
+        }
 
+        console.log('Creating map instance...');
         const mapInstance = new google.maps.Map(mapRef.current, {
           center,
           zoom,
@@ -72,6 +84,7 @@ const GoogleMap: React.FC<MapProps> = ({
           fullscreenControl: true,
         });
 
+        console.log('Map instance created successfully');
         setMap(mapInstance);
 
         // Initialize directions service
@@ -87,6 +100,7 @@ const GoogleMap: React.FC<MapProps> = ({
           });
         }
 
+        console.log('Map initialization complete');
         setIsLoading(false);
       } catch (err) {
         console.error('Error initializing map:', err);

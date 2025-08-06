@@ -268,7 +268,7 @@ const Shipments = ({ userId }: { userId: string }) => {
         <h2 className="text-xl font-semibold text-card-foreground mb-4">Add New Shipment</h2>
         <form onSubmit={handleAddShipment} className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="origin" className="block text-sm font-medium text-card-foreground mb-1">Origin</label>
+            <label htmlFor="origin" className="block text-sm font-medium text-card-foreground mb-1">Origin *</label>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -277,7 +277,7 @@ const Shipments = ({ userId }: { userId: string }) => {
                 value={newShipment.origin}
                 onChange={handleInputChange}
                 className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                placeholder="Farm A or coordinates"
+                placeholder="Click the pin button to select location"
                 required
               />
               <Button
@@ -285,13 +285,19 @@ const Shipments = ({ userId }: { userId: string }) => {
                 onClick={() => openMapForLocation('origin')}
                 variant="outline"
                 size="icon"
+                title="Click to select origin on map"
               >
                 <MapPin className="w-4 h-4" />
               </Button>
             </div>
+            {newShipment.originLat && newShipment.originLng && (
+              <p className="text-xs text-muted-foreground mt-1">
+                📍 Coordinates: {newShipment.originLat.toFixed(4)}, {newShipment.originLng.toFixed(4)}
+              </p>
+            )}
           </div>
           <div>
-            <label htmlFor="destination" className="block text-sm font-medium text-card-foreground mb-1">Destination</label>
+            <label htmlFor="destination" className="block text-sm font-medium text-card-foreground mb-1">Destination *</label>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -300,7 +306,7 @@ const Shipments = ({ userId }: { userId: string }) => {
                 value={newShipment.destination}
                 onChange={handleInputChange}
                 className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                placeholder="Processing Plant B or coordinates"
+                placeholder="Click the pin button to select location"
                 required
               />
               <Button
@@ -308,10 +314,16 @@ const Shipments = ({ userId }: { userId: string }) => {
                 onClick={() => openMapForLocation('destination')}
                 variant="outline"
                 size="icon"
+                title="Click to select destination on map"
               >
                 <MapPin className="w-4 h-4" />
               </Button>
             </div>
+            {newShipment.destinationLat && newShipment.destinationLng && (
+              <p className="text-xs text-muted-foreground mt-1">
+                📍 Coordinates: {newShipment.destinationLat.toFixed(4)}, {newShipment.destinationLng.toFixed(4)}
+              </p>
+            )}
           </div>
           <div>
             <label htmlFor="eta" className="block text-sm font-medium text-card-foreground mb-1">ETA</label>
