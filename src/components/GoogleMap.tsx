@@ -41,13 +41,28 @@ const GoogleMap: React.FC<MapProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+    let timeoutId: NodeJS.Timeout;
+    
     const initializeMap = async () => {
       try {
         console.log('Starting map initialization...');
         
+        // Add a small delay to ensure the ref is properly attached
+        await new Promise(resolve => {
+          timeoutId = setTimeout(resolve, 100);
+        });
+        
+        if (!mounted || !mapRef.current) {
+          console.log('Component unmounted or ref not ready');
+          return;
+        }
+        
         // Get Google Maps API key from Supabase Edge Function
         console.log('Fetching Google Maps API key...');
         const { data, error } = await supabase.functions.invoke('get-google-maps-key');
+        
+        if (!mounted) return;
         
         if (error) {
           console.error('Supabase function error:', error);
@@ -70,8 +85,8 @@ const GoogleMap: React.FC<MapProps> = ({
         const google = await loader.load();
         console.log('Google Maps API loaded successfully');
         
-        if (!mapRef.current) {
-          console.error('Map ref is null');
+        if (!mounted || !mapRef.current) {
+          console.log('Component unmounted during initialization');
           return;
         }
 
@@ -83,6 +98,8 @@ const GoogleMap: React.FC<MapProps> = ({
           streetViewControl: true,
           fullscreenControl: true,
         });
+
+        if (!mounted) return;
 
         console.log('Map instance created successfully');
         setMap(mapInstance);
@@ -103,6 +120,7 @@ const GoogleMap: React.FC<MapProps> = ({
         console.log('Map initialization complete');
         setIsLoading(false);
       } catch (err) {
+        if (!mounted) return;
         console.error('Error initializing map:', err);
         setError(err instanceof Error ? err.message : 'Failed to load map');
         setIsLoading(false);
@@ -110,6 +128,13 @@ const GoogleMap: React.FC<MapProps> = ({
     };
 
     initializeMap();
+    
+    return () => {
+      mounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, [center.lat, center.lng, zoom, onMapClick]);
 
   // Update routes when routes prop changes
