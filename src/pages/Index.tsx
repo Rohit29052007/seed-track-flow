@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Truck, LogOut, Home, Menu, X, Package, BarChart, PlusCircle, FileText, MapPin } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -29,16 +30,20 @@ const MessageModal = ({ message, onClose }: { message: string; onClose: () => vo
 
 const Dashboard = ({ userId }: { userId: string }) => {
   const [shipmentsCount, setShipmentsCount] = useState(0);
-  const [inventoryCount, setInventoryCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchCounts = async () => {
       try {
-        // For now, we'll use placeholder data since we haven't created tables yet
-        setShipmentsCount(0);
-        setInventoryCount(0);
+        const { data: shipments, error } = await supabase
+          .from('shipments')
+          .select('*', { count: 'exact' })
+          .eq('user_id', userId);
+        
+        if (error) throw error;
+        
+        setShipmentsCount(shipments?.length || 0);
         setLoading(false);
       } catch (e) {
         console.error("Error fetching dashboard data:", e);
@@ -66,13 +71,6 @@ const Dashboard = ({ userId }: { userId: string }) => {
             <p className="text-3xl font-semibold text-card-foreground">{shipmentsCount}</p>
           </div>
           <Truck className="text-primary w-10 h-10" />
-        </div>
-        <div className="bg-card p-6 rounded-lg shadow-card border flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Total Inventory Items</p>
-            <p className="text-3xl font-semibold text-card-foreground">{inventoryCount}</p>
-          </div>
-          <Package className="text-success w-10 h-10" />
         </div>
       </div>
 
@@ -107,9 +105,28 @@ const Shipments = ({ userId }: { userId: string }) => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // For now, we'll use placeholder data since we haven't created tables yet
-    setShipments([]);
-    setLoading(false);
+    const fetchShipments = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('shipments')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        setShipments(data || []);
+        setLoading(false);
+      } catch (e) {
+        console.error("Error fetching shipments:", e);
+        setError("Failed to load shipments.");
+        setLoading(false);
+      }
+    };
+
+    if (userId) {
+      fetchShipments();
+    }
   }, [userId]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -157,30 +174,51 @@ const Shipments = ({ userId }: { userId: string }) => {
       return;
     }
     
-    // Placeholder for future database implementation
-    const shipmentData = {
-      ...newShipment,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString()
-    };
-    
-    setShipments([...shipments, shipmentData]);
-    setNewShipment({ 
-      origin: '', 
-      destination: '', 
-      eta: '', 
-      status: 'Pending', 
-      type: '',
-      originLat: null,
-      originLng: null,
-      destinationLat: null,
-      destinationLng: null
-    });
-    
-    toast({
-      title: "Success",
-      description: "Shipment added successfully! (Demo mode - database tables needed for persistence)",
-    });
+    try {
+      const { data, error } = await supabase
+        .from('shipments')
+        .insert([{
+          user_id: userId,
+          title: newShipment.type,
+          origin_address: newShipment.origin,
+          origin_lat: newShipment.originLat,
+          origin_lng: newShipment.originLng,
+          destination_address: newShipment.destination,
+          destination_lat: newShipment.destinationLat,
+          destination_lng: newShipment.destinationLng,
+          status: newShipment.status.toLowerCase()
+        }])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      // Update local state
+      setShipments([data, ...shipments]);
+      
+      setNewShipment({ 
+        origin: '', 
+        destination: '', 
+        eta: '', 
+        status: 'Pending', 
+        type: '',
+        originLat: null,
+        originLng: null,
+        destinationLat: null,
+        destinationLng: null
+      });
+      
+      toast({
+        title: "Success",
+        description: "Shipment added successfully!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add shipment",
+        variant: "destructive"
+      });
+    }
   };
 
   // Create routes and markers for the map
@@ -188,13 +226,13 @@ const Shipments = ({ userId }: { userId: string }) => {
   
   const mapRoutes = shipments.reduce((routes: any[], shipment) => {
     console.log('Processing shipment for routes:', shipment);
-    if (shipment.originLat && shipment.originLng && shipment.destinationLat && shipment.destinationLng) {
+    if (shipment.origin_lat && shipment.origin_lng && shipment.destination_lat && shipment.destination_lng) {
       routes.push({
-        origin: { lat: shipment.originLat, lng: shipment.originLng },
-        destination: { lat: shipment.destinationLat, lng: shipment.destinationLng },
-        title: `${shipment.type} - ${shipment.status}`,
-        color: shipment.status === 'In Transit' ? '#f59e0b' : 
-               shipment.status === 'Delivered' ? '#10b981' : '#6366f1'
+        origin: { lat: Number(shipment.origin_lat), lng: Number(shipment.origin_lng) },
+        destination: { lat: Number(shipment.destination_lat), lng: Number(shipment.destination_lng) },
+        title: `${shipment.title} - ${shipment.status}`,
+        color: shipment.status === 'in_transit' ? '#f59e0b' : 
+               shipment.status === 'delivered' ? '#10b981' : '#6366f1'
       });
     }
     return routes;
@@ -202,20 +240,20 @@ const Shipments = ({ userId }: { userId: string }) => {
 
   const mapMarkers = shipments.reduce((markers: any[], shipment) => {
     console.log('Processing shipment for markers:', shipment);
-    if (shipment.originLat && shipment.originLng) {
+    if (shipment.origin_lat && shipment.origin_lng) {
       markers.push({
-        lat: shipment.originLat,
-        lng: shipment.originLng,
-        title: `Origin: ${shipment.origin}`,
-        info: `Shipment Type: ${shipment.type}\nStatus: ${shipment.status}`
+        lat: Number(shipment.origin_lat),
+        lng: Number(shipment.origin_lng),
+        title: `Origin: ${shipment.origin_address}`,
+        info: `Shipment Type: ${shipment.title}\nStatus: ${shipment.status}`
       });
     }
-    if (shipment.destinationLat && shipment.destinationLng) {
+    if (shipment.destination_lat && shipment.destination_lng) {
       markers.push({
-        lat: shipment.destinationLat,
-        lng: shipment.destinationLng,
-        title: `Destination: ${shipment.destination}`,
-        info: `Shipment Type: ${shipment.type}\nETA: ${shipment.eta}`
+        lat: Number(shipment.destination_lat),
+        lng: Number(shipment.destination_lng),
+        title: `Destination: ${shipment.destination_address}`,
+        info: `Shipment Type: ${shipment.title}`
       });
     }
     return markers;
@@ -395,14 +433,14 @@ const Shipments = ({ userId }: { userId: string }) => {
                 {shipments.map((shipment) => (
                   <tr key={shipment.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-card-foreground">{shipment.id.substring(0, 8)}...</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{shipment.origin}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{shipment.destination}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{shipment.type}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{shipment.eta}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{shipment.origin_address}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{shipment.destination_address}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{shipment.title}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">-</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        shipment.status === 'In Transit' ? 'bg-warning-light text-warning-foreground' :
-                        shipment.status === 'Delivered' ? 'bg-success-light text-success-foreground' :
+                        shipment.status === 'in_transit' ? 'bg-warning-light text-warning-foreground' :
+                        shipment.status === 'delivered' ? 'bg-success-light text-success-foreground' :
                         'bg-muted text-muted-foreground'
                       }`}>
                         {shipment.status}
@@ -410,7 +448,28 @@ const Shipments = ({ userId }: { userId: string }) => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <Button
-                        onClick={() => setShipments(shipments.filter(s => s.id !== shipment.id))}
+                        onClick={async () => {
+                          try {
+                            const { error } = await supabase
+                              .from('shipments')
+                              .delete()
+                              .eq('id', shipment.id);
+                            
+                            if (error) throw error;
+                            
+                            setShipments(shipments.filter(s => s.id !== shipment.id));
+                            toast({
+                              title: "Success",
+                              description: "Shipment deleted successfully"
+                            });
+                          } catch (error: any) {
+                            toast({
+                              title: "Error",
+                              description: error.message || "Failed to delete shipment",
+                              variant: "destructive"
+                            });
+                          }
+                        }}
                         variant="destructive"
                         size="sm"
                       >
@@ -674,8 +733,4 @@ const App = () => {
   );
 };
 
-const Index = () => {
-  return <App />;
-};
-
-export default Index;
+export default App;
