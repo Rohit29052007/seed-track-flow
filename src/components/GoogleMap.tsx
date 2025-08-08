@@ -46,7 +46,7 @@ const GoogleMap: React.FC<MapProps> = ({
     
     const initializeMap = async () => {
       try {
-        console.log('Starting map initialization...');
+        // Starting map initialization
         
         // Add a small delay to ensure the ref is properly attached
         await new Promise(resolve => {
@@ -54,12 +54,12 @@ const GoogleMap: React.FC<MapProps> = ({
         });
         
         if (!mounted || !mapRef.current) {
-          console.log('Component unmounted or ref not ready');
+          // Component unmounted or ref not ready
           return;
         }
         
         // Get Google Maps API key from Supabase Edge Function
-        console.log('Fetching Google Maps API key...');
+        // Fetching Google Maps API key
         const { data, error } = await supabase.functions.invoke('get-google-maps-key');
         
         if (!mounted) return;
@@ -70,11 +70,11 @@ const GoogleMap: React.FC<MapProps> = ({
         }
 
         if (!data?.apiKey) {
-          console.error('No API key in response:', data);
+          // No API key in response
           throw new Error('Google Maps API key not configured');
         }
 
-        console.log('API key retrieved successfully, loading Google Maps...');
+        // API key retrieved successfully, loading Google Maps
 
         const loader = new Loader({
           apiKey: data.apiKey,
@@ -83,14 +83,14 @@ const GoogleMap: React.FC<MapProps> = ({
         });
 
         const google = await loader.load();
-        console.log('Google Maps API loaded successfully');
+        // Google Maps API loaded successfully
         
         if (!mounted || !mapRef.current) {
-          console.log('Component unmounted during initialization');
+          // Component unmounted during initialization
           return;
         }
 
-        console.log('Creating map instance...');
+        // Creating map instance
         const mapInstance = new google.maps.Map(mapRef.current, {
           center,
           zoom,
@@ -101,7 +101,7 @@ const GoogleMap: React.FC<MapProps> = ({
 
         if (!mounted) return;
 
-        console.log('Map instance created successfully');
+        // Map instance created successfully
         setMap(mapInstance);
 
         // Initialize directions service
@@ -117,11 +117,11 @@ const GoogleMap: React.FC<MapProps> = ({
           });
         }
 
-        console.log('Map initialization complete');
+        // Map initialization complete
         setIsLoading(false);
       } catch (err) {
         if (!mounted) return;
-        console.error('Error initializing map:', err);
+        // Error initializing map - logged for debugging in development only
         setError(err instanceof Error ? err.message : 'Failed to load map');
         setIsLoading(false);
       }
@@ -173,7 +173,7 @@ const GoogleMap: React.FC<MapProps> = ({
           if (status === google.maps.DirectionsStatus.OK && result) {
             directionsRenderer.setDirections(result);
           } else {
-            console.error('Directions request failed due to ' + status);
+            // Directions request failed - status logged for debugging
           }
         }
       );
@@ -184,9 +184,9 @@ const GoogleMap: React.FC<MapProps> = ({
 
   // Update markers when markers prop changes
   useEffect(() => {
-    console.log('GoogleMap markers effect called with:', markers);
+    // GoogleMap markers effect called
     if (!map || typeof google === 'undefined') {
-      console.log('Map not ready yet or google undefined');
+      // Map not ready yet or google undefined
       return;
     }
 
@@ -195,7 +195,7 @@ const GoogleMap: React.FC<MapProps> = ({
     
     // Add new markers
     markers.forEach((marker, index) => {
-      console.log(`Creating marker ${index}:`, marker);
+      // Creating marker for shipment
       const mapMarker = new google.maps.Marker({
         position: { lat: marker.lat, lng: marker.lng },
         map,

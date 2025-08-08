@@ -222,10 +222,10 @@ const Shipments = ({ userId }: { userId: string }) => {
   };
 
   // Create routes and markers for the map
-  console.log('Shipments data:', shipments);
+  // Process shipments data for map visualization
   
   const mapRoutes = shipments.reduce((routes: any[], shipment) => {
-    console.log('Processing shipment for routes:', shipment);
+    // Processing shipment for routes
     if (shipment.origin_lat && shipment.origin_lng && shipment.destination_lat && shipment.destination_lng) {
       routes.push({
         origin: { lat: Number(shipment.origin_lat), lng: Number(shipment.origin_lng) },
@@ -239,7 +239,7 @@ const Shipments = ({ userId }: { userId: string }) => {
   }, []);
 
   const mapMarkers = shipments.reduce((markers: any[], shipment) => {
-    console.log('Processing shipment for markers:', shipment);
+    // Processing shipment for markers
     if (shipment.origin_lat && shipment.origin_lng) {
       markers.push({
         lat: Number(shipment.origin_lat),
@@ -259,8 +259,7 @@ const Shipments = ({ userId }: { userId: string }) => {
     return markers;
   }, []);
   
-  console.log('Map markers:', mapMarkers);
-  console.log('Map routes:', mapRoutes);
+  // Map data processed for visualization
 
   if (loading) return <LoadingSpinner />;
   if (error) return <div className="text-destructive p-4 text-center">{error}</div>;

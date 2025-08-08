@@ -1,20 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useInputValidation } from '@/hooks/useInputValidation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2 } from 'lucide-react';
 
 const Auth = () => {
-  const { signIn, signUp, user, loading: authLoading } = useAuth();
+  const { 
+    signIn, 
+    signUp, 
+    user, 
+    loading: authLoading,
+    getSignInAttemptsRemaining,
+    getSignUpAttemptsRemaining,
+    isSignInBlocked,
+    isSignUpBlocked
+  } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const { errors, validateAndUpdateField, clearAllErrors, hasErrors } = useInputValidation();
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -28,15 +38,27 @@ const Auth = () => {
     setLoading(true);
     setError(null);
     setSuccess(null);
+    clearAllErrors();
 
     const formData = new FormData(e.currentTarget);
     const email = formData.get('email') as string;
     const password = formData.get('password') as string;
 
+    // Check if blocked by rate limiting
+    if (isSignInBlocked()) {
+      setError('Too many login attempts. Please try again later.');
+      setLoading(false);
+      return;
+    }
+
     const { error } = await signIn(email, password);
     
     if (error) {
       setError(error.message);
+      const remaining = getSignInAttemptsRemaining();
+      if (remaining <= 2 && remaining > 0) {
+        setError(`${error.message} (${remaining} attempts remaining)`);
+      }
     } else {
       navigate('/');
     }
@@ -48,16 +70,28 @@ const Auth = () => {
     setLoading(true);
     setError(null);
     setSuccess(null);
+    clearAllErrors();
 
     const formData = new FormData(e.currentTarget);
     const email = formData.get('email') as string;
     const password = formData.get('password') as string;
     const fullName = formData.get('fullName') as string;
 
+    // Check if blocked by rate limiting
+    if (isSignUpBlocked()) {
+      setError('Too many signup attempts. Please try again later.');
+      setLoading(false);
+      return;
+    }
+
     const { error } = await signUp(email, password, fullName);
     
     if (error) {
       setError(error.message);
+      const remaining = getSignUpAttemptsRemaining();
+      if (remaining <= 1 && remaining > 0) {
+        setError(`${error.message} (${remaining} attempts remaining)`);
+      }
     } else {
       setSuccess('Account created successfully! Please check your email to verify your account.');
     }
@@ -67,7 +101,7 @@ const Auth = () => {
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
@@ -105,8 +139,19 @@ const Auth = () => {
                       name="email"
                       type="email"
                       placeholder="Enter your email"
+                      maxLength={254}
                       required
+                      onChange={(e) => {
+                        validateAndUpdateField('signin-email', e.target.value, {
+                          required: true,
+                          email: true,
+                          maxLength: 254
+                        });
+                      }}
                     />
+                    {errors['signin-email'] && (
+                      <p className="text-sm text-destructive">{errors['signin-email']}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signin-password">Password</Label>
@@ -115,8 +160,18 @@ const Auth = () => {
                       name="password"
                       type="password"
                       placeholder="Enter your password"
+                      maxLength={128}
                       required
+                      onChange={(e) => {
+                        validateAndUpdateField('signin-password', e.target.value, {
+                          required: true,
+                          maxLength: 128
+                        });
+                      }}
                     />
+                    {errors['signin-password'] && (
+                      <p className="text-sm text-destructive">{errors['signin-password']}</p>
+                    )}
                   </div>
                   {error && (
                     <Alert variant="destructive">
@@ -125,16 +180,25 @@ const Auth = () => {
                   )}
                 </CardContent>
                 <CardFooter>
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={loading || hasErrors() || isSignInBlocked()}
+                  >
                     {loading ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-current" />
                         Signing in...
                       </>
                     ) : (
                       'Sign In'
                     )}
                   </Button>
+                  {isSignInBlocked() && (
+                    <p className="text-sm text-warning text-center mt-2">
+                      Account temporarily locked due to too many failed attempts
+                    </p>
+                  )}
                 </CardFooter>
               </form>
             </Card>
@@ -157,8 +221,19 @@ const Auth = () => {
                       name="fullName"
                       type="text"
                       placeholder="Enter your full name"
+                      maxLength={100}
                       required
+                      onChange={(e) => {
+                        validateAndUpdateField('signup-name', e.target.value, {
+                          required: true,
+                          maxLength: 100,
+                          pattern: /^[a-zA-Z\s\-'\.]+$/
+                        });
+                      }}
                     />
+                    {errors['signup-name'] && (
+                      <p className="text-sm text-destructive">{errors['signup-name']}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signup-email">Email</Label>
@@ -167,8 +242,19 @@ const Auth = () => {
                       name="email"
                       type="email"
                       placeholder="Enter your email"
+                      maxLength={254}
                       required
+                      onChange={(e) => {
+                        validateAndUpdateField('signup-email', e.target.value, {
+                          required: true,
+                          email: true,
+                          maxLength: 254
+                        });
+                      }}
                     />
+                    {errors['signup-email'] && (
+                      <p className="text-sm text-destructive">{errors['signup-email']}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signup-password">Password</Label>
@@ -176,9 +262,23 @@ const Auth = () => {
                       id="signup-password"
                       name="password"
                       type="password"
-                      placeholder="Create a password"
+                      placeholder="Create a strong password"
+                      maxLength={128}
                       required
+                      onChange={(e) => {
+                        validateAndUpdateField('signup-password', e.target.value, {
+                          required: true,
+                          strongPassword: true,
+                          maxLength: 128
+                        });
+                      }}
                     />
+                    {errors['signup-password'] && (
+                      <p className="text-sm text-destructive">{errors['signup-password']}</p>
+                    )}
+                    <div className="text-xs text-muted-foreground">
+                      Password must be at least 8 characters with uppercase, lowercase, number, and special character
+                    </div>
                   </div>
                   {error && (
                     <Alert variant="destructive">
@@ -192,16 +292,25 @@ const Auth = () => {
                   )}
                 </CardContent>
                 <CardFooter>
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={loading || hasErrors() || isSignUpBlocked()}
+                  >
                     {loading ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-current" />
                         Creating account...
                       </>
                     ) : (
                       'Create Account'
                     )}
                   </Button>
+                  {isSignUpBlocked() && (
+                    <p className="text-sm text-warning text-center mt-2">
+                      Too many signup attempts. Please try again later.
+                    </p>
+                  )}
                 </CardFooter>
               </form>
             </Card>
