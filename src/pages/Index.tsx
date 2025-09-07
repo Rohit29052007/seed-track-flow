@@ -1,133 +1,159 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Truck, LogOut, Home, Menu, X, Package, BarChart, PlusCircle, FileText, MapPin } from 'lucide-react';
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
-import GoogleMap from "@/components/GoogleMap";
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import GoogleMap from '@/components/GoogleMap';
+import { EnhancedReports } from '@/components/EnhancedReports';
+import { RoleSelection } from '@/components/RoleSelection';
+import { Menu, Package, BarChart3, Package2, LogOut, X, Shield, Wheat, Truck } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 
-// --- Components ---
-
+// Utility Components
 const LoadingSpinner = () => (
-  <div className="flex justify-center items-center h-full">
-    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+  <div className="flex items-center justify-center h-screen">
+    <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
   </div>
 );
 
-const MessageModal = ({ message, onClose }: { message: string; onClose: () => void }) => {
-  return (
-    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-      <div className="bg-card rounded-lg shadow-elegant p-6 max-w-sm w-full text-center border">
-        <p className="text-lg font-semibold mb-4 text-card-foreground">{message}</p>
-        <Button onClick={onClose} size="sm">
-          OK
-        </Button>
-      </div>
+const MessageModal = ({ message, onClose }: { message: string; onClose: () => void }) => (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-card p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
+      <p className="text-card-foreground mb-4">{message}</p>
+      <Button onClick={onClose} className="w-full">
+        Close
+      </Button>
     </div>
-  );
-};
+  </div>
+);
 
-const Dashboard = ({ userId }: { userId: string }) => {
-  const [shipmentsCount, setShipmentsCount] = useState(0);
+// Page Components
+const Dashboard = ({ userId, userRole }: { userId: string; userRole: string }) => {
+  const [shipmentCount, setShipmentCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchCounts = async () => {
+    const fetchShipmentCount = async () => {
       try {
-        const { data: shipments, error } = await supabase
-          .from('shipments')
-          .select('*', { count: 'exact' })
-          .eq('user_id', userId);
+        let query = supabase.from('shipments').select('*', { count: 'exact' });
         
+        if (userRole !== 'administrator') {
+          query = query.eq('user_id', userId);
+        }
+
+        const { count, error } = await query;
+
         if (error) throw error;
-        
-        setShipmentsCount(shipments?.length || 0);
-        setLoading(false);
-      } catch (e) {
-        console.error("Error fetching dashboard data:", e);
-        setError("Failed to load dashboard data.");
+        setShipmentCount(count || 0);
+      } catch (error) {
+        console.error('Error fetching shipments:', error);
+      } finally {
         setLoading(false);
       }
     };
 
-    if (userId) {
-      fetchCounts();
-    }
-  }, [userId]);
+    fetchShipmentCount();
+  }, [userId, userRole]);
 
-  if (loading) return <LoadingSpinner />;
-  if (error) return <div className="text-destructive p-4 text-center">{error}</div>;
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  const getRoleWelcomeMessage = () => {
+    switch (userRole) {
+      case 'administrator':
+        return 'Welcome, Administrator! You have full system access.';
+      case 'farmer':
+        return 'Welcome, Farmer! Manage your oil seed shipments and track deliveries.';
+      case 'transporter':
+        return 'Welcome, Transporter! View assigned shipments and update delivery status.';
+      default:
+        return 'Welcome to Seed Track Flow!';
+    }
+  };
 
   return (
     <div className="p-6 bg-background min-h-screen">
-      <h1 className="text-3xl font-bold text-foreground mb-8 rounded-md p-4 bg-card shadow-card border">Dashboard</h1>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <div className="bg-card p-6 rounded-lg shadow-card border flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Total Shipments</p>
-            <p className="text-3xl font-semibold text-card-foreground">{shipmentsCount}</p>
-          </div>
-          <Truck className="text-primary w-10 h-10" />
-        </div>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard</h1>
+        <p className="text-muted-foreground">{getRoleWelcomeMessage()}</p>
       </div>
-
-      <div className="bg-card p-6 rounded-lg shadow-card border">
-        <h2 className="text-xl font-semibold text-card-foreground mb-4">Quick Overview</h2>
-        <p className="text-muted-foreground">
-          Welcome to your Oil Seed Supply Chain Tracker dashboard! Here you can get a quick glance at your key metrics.
-          Use the sidebar to navigate to Shipments, Inventory, or Reports.
-        </p>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="bg-card p-6 rounded-lg shadow-card border">
+          <h2 className="text-xl font-semibold text-card-foreground mb-2">
+            {userRole === 'administrator' ? 'Total System Shipments' : 'Your Shipments'}
+          </h2>
+          <p className="text-3xl font-bold text-primary">{shipmentCount}</p>
+          <p className="text-muted-foreground">Active shipments in the system</p>
+        </div>
+        
+        <div className="bg-card p-6 rounded-lg shadow-card border">
+          <h2 className="text-xl font-semibold text-card-foreground mb-2">Your Role</h2>
+          <Badge className="text-sm" variant="secondary">
+            {userRole?.charAt(0).toUpperCase() + userRole?.slice(1)}
+          </Badge>
+          <p className="text-muted-foreground mt-2">Current system role</p>
+        </div>
+        
+        <div className="bg-card p-6 rounded-lg shadow-card border">
+          <h2 className="text-xl font-semibold text-card-foreground mb-2">Quick Actions</h2>
+          <p className="text-muted-foreground">
+            Use the sidebar to navigate to {userRole === 'farmer' || userRole === 'administrator' ? 'Shipments, ' : ''}
+            Reports{userRole === 'administrator' ? ', and Inventory' : ''}.
+          </p>
+        </div>
       </div>
     </div>
   );
 };
 
-const Shipments = ({ userId }: { userId: string }) => {
+const Shipments = ({ userId, userRole }: { userId: string; userRole: string }) => {
   const [shipments, setShipments] = useState<any[]>([]);
-  const [newShipment, setNewShipment] = useState({ 
-    origin: '', 
-    destination: '', 
-    eta: '', 
-    status: 'Pending', 
-    type: '',
-    originLat: null as number | null,
-    originLng: null as number | null,
-    destinationLat: null as number | null,
-    destinationLng: null as number | null
+  const [newShipment, setNewShipment] = useState({
+    title: '',
+    origin_address: '',
+    destination_address: '',
+    origin_lat: null as number | null,
+    origin_lng: null as number | null,
+    destination_lat: null as number | null,
+    destination_lng: null as number | null
   });
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showMap, setShowMap] = useState(false);
-  const [mapMode, setMapMode] = useState<'origin' | 'destination' | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
-    const fetchShipments = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('shipments')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false });
-        
-        if (error) throw error;
-        
-        setShipments(data || []);
-        setLoading(false);
-      } catch (e) {
-        console.error("Error fetching shipments:", e);
-        setError("Failed to load shipments.");
-        setLoading(false);
-      }
-    };
+    fetchShipments();
+  }, [userId, userRole]);
 
-    if (userId) {
-      fetchShipments();
+  const fetchShipments = async () => {
+    try {
+      let query = supabase.from('shipments').select('*');
+      
+      if (userRole !== 'administrator') {
+        query = query.eq('user_id', userId);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setShipments(data || []);
+    } catch (error) {
+      console.error('Error fetching shipments:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load shipments. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
-  }, [userId]);
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -135,345 +161,264 @@ const Shipments = ({ userId }: { userId: string }) => {
   };
 
   const handleMapClick = (lat: number, lng: number) => {
-    if (mapMode === 'origin') {
-      setNewShipment({ 
-        ...newShipment, 
-        originLat: lat, 
-        originLng: lng,
-        origin: `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+    if (!newShipment.origin_lat && !newShipment.origin_lng) {
+      setNewShipment({
+        ...newShipment,
+        origin_lat: lat,
+        origin_lng: lng
       });
-    } else if (mapMode === 'destination') {
-      setNewShipment({ 
-        ...newShipment, 
-        destinationLat: lat, 
-        destinationLng: lng,
-        destination: `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+      setModalMessage('Origin location set! Click again to set destination.');
+      setShowModal(true);
+    } else if (!newShipment.destination_lat && !newShipment.destination_lng) {
+      setNewShipment({
+        ...newShipment,
+        destination_lat: lat,
+        destination_lng: lng
       });
+      setModalMessage('Destination location set! You can now create the shipment.');
+      setShowModal(true);
     }
-    setShowMap(false);
-    setMapMode(null);
-    toast({
-      title: "Location Set",
-      description: `${mapMode === 'origin' ? 'Origin' : 'Destination'} coordinates updated`
+  };
+
+  const resetLocations = () => {
+    setNewShipment({
+      ...newShipment,
+      origin_lat: null,
+      origin_lng: null,
+      destination_lat: null,
+      destination_lng: null
     });
   };
 
-  const openMapForLocation = (type: 'origin' | 'destination') => {
-    setMapMode(type);
-    setShowMap(true);
-  };
-
-  const handleAddShipment = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newShipment.origin || !newShipment.destination || !newShipment.eta || !newShipment.type) {
+    
+    if (userRole === 'transporter') {
       toast({
-        title: "Error",
-        description: "Please fill in all fields.",
+        title: "Access Denied",
+        description: "Only farmers and administrators can create shipments.",
         variant: "destructive"
       });
       return;
     }
-    
-    try {
-      const { data, error } = await supabase
-        .from('shipments')
-        .insert([{
-          user_id: userId,
-          title: newShipment.type,
-          origin_address: newShipment.origin,
-          origin_lat: newShipment.originLat,
-          origin_lng: newShipment.originLng,
-          destination_address: newShipment.destination,
-          destination_lat: newShipment.destinationLat,
-          destination_lng: newShipment.destinationLng,
-          status: newShipment.status.toLowerCase()
-        }])
-        .select()
-        .single();
-      
-      if (error) throw error;
-      
-      // Update local state
-      setShipments([data, ...shipments]);
-      
-      setNewShipment({ 
-        origin: '', 
-        destination: '', 
-        eta: '', 
-        status: 'Pending', 
-        type: '',
-        originLat: null,
-        originLng: null,
-        destinationLat: null,
-        destinationLng: null
-      });
-      
-      toast({
-        title: "Success",
-        description: "Shipment added successfully!",
-      });
-    } catch (error: any) {
+
+    if (!newShipment.title || !newShipment.origin_address || !newShipment.destination_address) {
       toast({
         title: "Error",
-        description: error.message || "Failed to add shipment",
+        description: "Please fill in all required fields.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('shipments')
+        .insert([{
+          ...newShipment,
+          user_id: userId,
+          status: 'pending'
+        }]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Shipment created successfully!",
+      });
+
+      setNewShipment({
+        title: '',
+        origin_address: '',
+        destination_address: '',
+        origin_lat: null,
+        origin_lng: null,
+        destination_lat: null,
+        destination_lng: null
+      });
+
+      fetchShipments();
+    } catch (error) {
+      console.error('Error creating shipment:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create shipment. Please try again.",
         variant: "destructive"
       });
     }
   };
 
-  // Create routes and markers for the map
-  // Process shipments data for map visualization
-  
-  const mapRoutes = shipments.reduce((routes: any[], shipment) => {
-    // Processing shipment for routes
-    if (shipment.origin_lat && shipment.origin_lng && shipment.destination_lat && shipment.destination_lng) {
-      routes.push({
-        origin: { lat: Number(shipment.origin_lat), lng: Number(shipment.origin_lng) },
-        destination: { lat: Number(shipment.destination_lat), lng: Number(shipment.destination_lng) },
-        title: `${shipment.title} - ${shipment.status}`,
-        color: shipment.status === 'in_transit' ? '#f59e0b' : 
-               shipment.status === 'delivered' ? '#10b981' : '#6366f1'
+  const getMapMarkers = () => {
+    const markers = [];
+    
+    if (newShipment.origin_lat && newShipment.origin_lng) {
+      markers.push({
+        lat: newShipment.origin_lat,
+        lng: newShipment.origin_lng,
+        title: "Origin",
+        info: "Pickup location"
       });
     }
-    return routes;
-  }, []);
+    
+    if (newShipment.destination_lat && newShipment.destination_lng) {
+      markers.push({
+        lat: newShipment.destination_lat,
+        lng: newShipment.destination_lng,
+        title: "Destination",
+        info: "Drop-off location"
+      });
+    }
 
-  const mapMarkers = shipments.reduce((markers: any[], shipment) => {
-    // Processing shipment for markers
-    if (shipment.origin_lat && shipment.origin_lng) {
-      markers.push({
-        lat: Number(shipment.origin_lat),
-        lng: Number(shipment.origin_lng),
-        title: `Origin: ${shipment.origin_address}`,
-        info: `Shipment Type: ${shipment.title}\nStatus: ${shipment.status}`
-      });
-    }
-    if (shipment.destination_lat && shipment.destination_lng) {
-      markers.push({
-        lat: Number(shipment.destination_lat),
-        lng: Number(shipment.destination_lng),
-        title: `Destination: ${shipment.destination_address}`,
-        info: `Shipment Type: ${shipment.title}`
-      });
-    }
     return markers;
-  }, []);
-  
-  // Map data processed for visualization
+  };
 
-  if (loading) return <LoadingSpinner />;
-  if (error) return <div className="text-destructive p-4 text-center">{error}</div>;
+  const getMapRoutes = () => {
+    if (newShipment.origin_lat && newShipment.origin_lng && 
+        newShipment.destination_lat && newShipment.destination_lng) {
+      return [{
+        origin: { lat: newShipment.origin_lat, lng: newShipment.origin_lng },
+        destination: { lat: newShipment.destination_lat, lng: newShipment.destination_lng },
+        title: "Delivery Route",
+        color: "#3b82f6"
+      }];
+    }
+    return [];
+  };
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <div className="p-6 bg-background min-h-screen">
-      {/* Map Modal */}
-      {showMap && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-          <div className="bg-card rounded-lg shadow-elegant p-6 max-w-4xl w-full max-h-[80vh] border">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-card-foreground">
-                Select {mapMode === 'origin' ? 'Origin' : 'Destination'} Location
-              </h3>
-              <Button
-                onClick={() => {
-                  setShowMap(false);
-                  setMapMode(null);
-                }}
-                variant="ghost"
-                size="icon"
-              >
-                <X className="w-4 h-4" />
-              </Button>
+      <h1 className="text-3xl font-bold text-foreground mb-8">
+        {userRole === 'administrator' ? 'All Shipments' : 'Your Shipments'}
+      </h1>
+      
+      {showModal && (
+        <MessageModal
+          message={modalMessage}
+          onClose={() => setShowModal(false)}
+        />
+      )}
+
+      {(userRole === 'farmer' || userRole === 'administrator') && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <div className="bg-card p-6 rounded-lg shadow-card border">
+            <h2 className="text-xl font-semibold text-card-foreground mb-4">Create New Shipment</h2>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="title">Shipment Title</Label>
+                <Input
+                  id="title"
+                  name="title"
+                  value={newShipment.title}
+                  onChange={handleInputChange}
+                  placeholder="e.g., Oil Seed Batch #001"
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="origin_address">Origin Address</Label>
+                <Input
+                  id="origin_address"
+                  name="origin_address"
+                  value={newShipment.origin_address}
+                  onChange={handleInputChange}
+                  placeholder="Farm address"
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="destination_address">Destination Address</Label>
+                <Input
+                  id="destination_address"
+                  name="destination_address"
+                  value={newShipment.destination_address}
+                  onChange={handleInputChange}
+                  placeholder="Delivery address"
+                  required
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={resetLocations}
+                  className="flex-1"
+                >
+                  Reset Locations
+                </Button>
+                <Button type="submit" className="flex-1">
+                  Create Shipment
+                </Button>
+              </div>
+            </form>
+
+            <div className="mt-4 text-sm text-muted-foreground">
+              <p>Current selections:</p>
+              <p>Origin: {newShipment.origin_lat && newShipment.origin_lng ? `${newShipment.origin_lat.toFixed(4)}, ${newShipment.origin_lng.toFixed(4)}` : 'Not set'}</p>
+              <p>Destination: {newShipment.destination_lat && newShipment.destination_lng ? `${newShipment.destination_lat.toFixed(4)}, ${newShipment.destination_lng.toFixed(4)}` : 'Not set'}</p>
             </div>
+          </div>
+
+          <div className="bg-card p-6 rounded-lg shadow-card border">
+            <h2 className="text-xl font-semibold text-card-foreground mb-4">Select Locations</h2>
             <p className="text-muted-foreground mb-4">
-              Click on the map to set the {mapMode === 'origin' ? 'origin' : 'destination'} coordinates
+              Click on the map to set origin and destination locations for your shipment.
             </p>
+            
             <GoogleMap
-              height="500px"
+              height="400px"
+              markers={getMapMarkers()}
+              routes={getMapRoutes()}
               onMapClick={handleMapClick}
-              center={{ lat: 39.8283, lng: -98.5795 }}
-              zoom={4}
+              center={{ lat: 20.5937, lng: 78.9629 }}
+              zoom={5}
             />
           </div>
         </div>
       )}
 
-      <h1 className="text-3xl font-bold text-foreground mb-8 rounded-md p-4 bg-card shadow-card border">Shipment Management</h1>
-
-      {/* Add New Shipment Form */}
-      <div className="bg-card p-6 rounded-lg shadow-card border mb-8">
-        <h2 className="text-xl font-semibold text-card-foreground mb-4">Add New Shipment</h2>
-        <form onSubmit={handleAddShipment} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="origin" className="block text-sm font-medium text-card-foreground mb-1">Origin *</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                id="origin"
-                name="origin"
-                value={newShipment.origin}
-                onChange={handleInputChange}
-                className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                placeholder="Click the pin button to select location"
-                required
-              />
-              <Button
-                type="button"
-                onClick={() => openMapForLocation('origin')}
-                variant="outline"
-                size="icon"
-                title="Click to select origin on map"
-              >
-                <MapPin className="w-4 h-4" />
-              </Button>
-            </div>
-            {newShipment.originLat && newShipment.originLng && (
-              <p className="text-xs text-muted-foreground mt-1">
-                📍 Coordinates: {newShipment.originLat.toFixed(4)}, {newShipment.originLng.toFixed(4)}
-              </p>
-            )}
-          </div>
-          <div>
-            <label htmlFor="destination" className="block text-sm font-medium text-card-foreground mb-1">Destination *</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                id="destination"
-                name="destination"
-                value={newShipment.destination}
-                onChange={handleInputChange}
-                className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                placeholder="Click the pin button to select location"
-                required
-              />
-              <Button
-                type="button"
-                onClick={() => openMapForLocation('destination')}
-                variant="outline"
-                size="icon"
-                title="Click to select destination on map"
-              >
-                <MapPin className="w-4 h-4" />
-              </Button>
-            </div>
-            {newShipment.destinationLat && newShipment.destinationLng && (
-              <p className="text-xs text-muted-foreground mt-1">
-                📍 Coordinates: {newShipment.destinationLat.toFixed(4)}, {newShipment.destinationLng.toFixed(4)}
-              </p>
-            )}
-          </div>
-          <div>
-            <label htmlFor="eta" className="block text-sm font-medium text-card-foreground mb-1">ETA</label>
-            <input
-              type="text"
-              id="eta"
-              name="eta"
-              value={newShipment.eta}
-              onChange={handleInputChange}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
-              placeholder="YYYY-MM-DD HH:MM"
-              required
-            />
-          </div>
-          <div>
-            <label htmlFor="type" className="block text-sm font-medium text-card-foreground mb-1">Oil Seed Type</label>
-            <input
-              type="text"
-              id="type"
-              name="type"
-              value={newShipment.type}
-              onChange={handleInputChange}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
-              placeholder="Soybean, Sunflower, etc."
-              required
-            />
-          </div>
-          <div className="md:col-span-2 flex justify-end">
-            <Button type="submit" className="shadow-card">
-              <PlusCircle className="w-4 h-4" />
-              Add Shipment
-            </Button>
-          </div>
-        </form>
-      </div>
-
-      {/* Tracking Map */}
-      <div className="bg-card p-6 rounded-lg shadow-card border mb-8">
-        <h2 className="text-xl font-semibold text-card-foreground mb-4">Shipment Tracking Map</h2>
-        <GoogleMap
-          height="400px"
-          markers={mapMarkers}
-          routes={mapRoutes}
-          center={{ lat: 39.8283, lng: -98.5795 }}
-          zoom={4}
-        />
-      </div>
-
-      {/* Current Shipments Table */}
       <div className="bg-card p-6 rounded-lg shadow-card border">
-        <h2 className="text-xl font-semibold text-card-foreground mb-4">Current Shipments</h2>
+        <h2 className="text-xl font-semibold text-card-foreground mb-4">
+          {userRole === 'administrator' ? 'All Shipments' : 'Your Shipments'}
+        </h2>
+        
         {shipments.length === 0 ? (
-          <p className="text-muted-foreground">No shipments recorded yet. Add a shipment to see it on the map.</p>
+          <p className="text-muted-foreground">No shipments found.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-border">
-              <thead className="bg-muted">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">ID</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Origin</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Destination</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">ETA</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left p-2 text-muted-foreground">Title</th>
+                  <th className="text-left p-2 text-muted-foreground">Origin</th>
+                  <th className="text-left p-2 text-muted-foreground">Destination</th>
+                  <th className="text-left p-2 text-muted-foreground">Status</th>
+                  <th className="text-left p-2 text-muted-foreground">Created</th>
                 </tr>
               </thead>
-              <tbody className="bg-card divide-y divide-border">
+              <tbody>
                 {shipments.map((shipment) => (
-                  <tr key={shipment.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-card-foreground">{shipment.id.substring(0, 8)}...</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{shipment.origin_address}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{shipment.destination_address}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{shipment.title}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">-</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        shipment.status === 'in_transit' ? 'bg-warning-light text-warning-foreground' :
-                        shipment.status === 'delivered' ? 'bg-success-light text-success-foreground' :
-                        'bg-muted text-muted-foreground'
-                      }`}>
-                        {shipment.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Button
-                        onClick={async () => {
-                          try {
-                            const { error } = await supabase
-                              .from('shipments')
-                              .delete()
-                              .eq('id', shipment.id);
-                            
-                            if (error) throw error;
-                            
-                            setShipments(shipments.filter(s => s.id !== shipment.id));
-                            toast({
-                              title: "Success",
-                              description: "Shipment deleted successfully"
-                            });
-                          } catch (error: any) {
-                            toast({
-                              title: "Error",
-                              description: error.message || "Failed to delete shipment",
-                              variant: "destructive"
-                            });
-                          }
-                        }}
-                        variant="destructive"
-                        size="sm"
+                  <tr key={shipment.id} className="border-b border-border hover:bg-muted/50">
+                    <td className="p-2 font-medium text-foreground">{shipment.title}</td>
+                    <td className="p-2 text-muted-foreground">{shipment.origin_address || 'N/A'}</td>
+                    <td className="p-2 text-muted-foreground">{shipment.destination_address || 'N/A'}</td>
+                    <td className="p-2">
+                      <Badge 
+                        variant={shipment.status === 'completed' ? 'default' : 
+                                shipment.status === 'in-transit' ? 'secondary' : 'outline'}
                       >
-                        Delete
-                      </Button>
+                        {shipment.status}
+                      </Badge>
+                    </td>
+                    <td className="p-2 text-muted-foreground">
+                      {new Date(shipment.created_at).toLocaleDateString()}
                     </td>
                   </tr>
                 ))}
@@ -521,58 +466,56 @@ const Inventory = ({ userId }: { userId: string }) => {
     });
   };
 
-  if (loading) return <LoadingSpinner />;
+  if (loading) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <div className="p-6 bg-background min-h-screen">
-      <h1 className="text-3xl font-bold text-foreground mb-8 rounded-md p-4 bg-card shadow-card border">Inventory Management</h1>
-
+      <h1 className="text-3xl font-bold text-foreground mb-8">Inventory Management</h1>
+      
       {/* Add New Item Form */}
-      <div className="bg-card p-6 rounded-lg shadow-card border mb-8">
-        <h2 className="text-xl font-semibold text-card-foreground mb-4">Add New Inventory Item</h2>
-        <form onSubmit={handleAddItem} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="bg-card p-6 rounded-lg shadow-card border mb-6">
+        <h2 className="text-xl font-semibold text-card-foreground mb-4">Add Inventory Item</h2>
+        <form onSubmit={handleAddItem} className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label htmlFor="type" className="block text-sm font-medium text-card-foreground mb-1">Oil Seed Type</label>
-            <input
-              type="text"
+            <Label htmlFor="type">Item Type</Label>
+            <Input
               id="type"
               name="type"
               value={newItem.type}
               onChange={handleInputChange}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
-              placeholder="Soybean, Sunflower, etc."
+              placeholder="e.g., Sunflower Seeds"
               required
             />
           </div>
+          
           <div>
-            <label htmlFor="quantity" className="block text-sm font-medium text-card-foreground mb-1">Quantity (kg)</label>
-            <input
-              type="number"
+            <Label htmlFor="quantity">Quantity</Label>
+            <Input
               id="quantity"
               name="quantity"
               value={newItem.quantity}
               onChange={handleInputChange}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
-              placeholder="1000"
+              placeholder="e.g., 100 kg"
               required
             />
           </div>
+          
           <div>
-            <label htmlFor="location" className="block text-sm font-medium text-card-foreground mb-1">Storage Location</label>
-            <input
-              type="text"
+            <Label htmlFor="location">Storage Location</Label>
+            <Input
               id="location"
               name="location"
               value={newItem.location}
               onChange={handleInputChange}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
-              placeholder="Warehouse A"
+              placeholder="e.g., Warehouse A"
               required
             />
           </div>
-          <div className="md:col-span-3 flex justify-end">
-            <Button type="submit" className="shadow-card">
-              <PlusCircle className="w-4 h-4" />
+          
+          <div className="flex items-end">
+            <Button type="submit" className="w-full">
               Add Item
             </Button>
           </div>
@@ -588,146 +531,190 @@ const Inventory = ({ userId }: { userId: string }) => {
   );
 };
 
-const Reports = () => {
-  return (
-    <div className="p-6 bg-background min-h-screen">
-      <h1 className="text-3xl font-bold text-foreground mb-8 rounded-md p-4 bg-card shadow-card border">Reports</h1>
-      <div className="bg-card p-6 rounded-lg shadow-card border">
-        <h2 className="text-xl font-semibold text-card-foreground mb-4">Analytics Dashboard</h2>
-        <p className="text-muted-foreground">
-          Reports and analytics will be available once you start tracking shipments and inventory data.
-        </p>
-      </div>
-    </div>
-  );
-};
-
 const App = () => {
+  const { user, signOut } = useAuth();
+  const { userRole, loading: roleLoading, assignRole } = useUserRole(user);
   const [currentPage, setCurrentPage] = useState('dashboard');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { user, loading, signOut } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Redirect to auth if not logged in
   useEffect(() => {
-    if (!loading && !user) {
+    if (!user) {
       window.location.href = '/auth';
     }
-  }, [user, loading]);
-
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
-
-  const renderPage = () => {
-    if (loading) {
-      return <LoadingSpinner />;
-    }
-
-    if (!user) {
-      return null; // Will redirect to auth
-    }
-
-    switch (currentPage) {
-      case 'dashboard':
-        return <Dashboard userId={user.id} />;
-      case 'shipments':
-        return <Shipments userId={user.id} />;
-      case 'inventory':
-        return <Inventory userId={user.id} />;
-      case 'reports':
-        return <Reports />;
-      default:
-        return <Dashboard userId={user.id} />;
-    }
-  };
-
-  if (loading) {
-    return <LoadingSpinner />;
-  }
+  }, [user]);
 
   if (!user) {
-    return null; // Will redirect to auth
+    return null;
   }
 
+  // Show role selection if user doesn't have a role yet
+  if (!roleLoading && !userRole) {
+    return (
+      <RoleSelection
+        onRoleSelect={async (role) => {
+          const result = await assignRole(role);
+          if (result.error) {
+            console.error('Failed to assign role:', result.error);
+          }
+        }}
+        loading={roleLoading}
+      />
+    );
+  }
+
+  if (roleLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  const handleSignOut = async () => {
+    await signOut();
+    window.location.href = '/auth';
+  };
+
+  const getRoleIcon = () => {
+    switch (userRole) {
+      case 'administrator':
+        return Shield;
+      case 'farmer':
+        return Wheat;
+      case 'transporter':
+        return Truck;
+      default:
+        return Package;
+    }
+  };
+
+  const getRoleColor = () => {
+    switch (userRole) {
+      case 'administrator':
+        return 'bg-red-100 text-red-800';
+      case 'farmer':
+        return 'bg-green-100 text-green-800';
+      case 'transporter':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getMenuItems = () => {
+    const baseItems = [
+      { id: 'dashboard', name: 'Dashboard', icon: BarChart3 },
+    ];
+
+    if (userRole === 'farmer' || userRole === 'administrator') {
+      baseItems.push({ id: 'shipments', name: 'Shipments', icon: Package });
+    }
+
+    if (userRole === 'administrator') {
+      baseItems.push({ id: 'inventory', name: 'Inventory', icon: Package2 });
+    }
+
+    baseItems.push({ id: 'reports', name: 'Reports', icon: BarChart3 });
+
+    return baseItems;
+  };
+
+  const menuItems = getMenuItems();
+
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex h-screen bg-background">
       {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 bg-sidebar text-sidebar-foreground w-64 p-6 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out z-40 shadow-elegant border-r border-sidebar-border`}>
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold">Oil Seed Tracker</h2>
-          <button onClick={toggleSidebar} className="md:hidden text-sidebar-foreground">
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-        <nav>
-          <ul>
-            <li className="mb-4">
-              <Button
-                onClick={() => { setCurrentPage('dashboard'); setIsSidebarOpen(false); }}
-                variant="sidebar"
-                className={`w-full justify-start ${currentPage === 'dashboard' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : ''}`}
-              >
-                <Home className="w-5 h-5" />
-                Dashboard
-              </Button>
-            </li>
-            <li className="mb-4">
-              <Button
-                onClick={() => { setCurrentPage('shipments'); setIsSidebarOpen(false); }}
-                variant="sidebar"
-                className={`w-full justify-start ${currentPage === 'shipments' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : ''}`}
-              >
-                <Truck className="w-5 h-5" />
-                Shipments
-              </Button>
-            </li>
-            <li className="mb-4">
-              <Button
-                onClick={() => { setCurrentPage('inventory'); setIsSidebarOpen(false); }}
-                variant="sidebar"
-                className={`w-full justify-start ${currentPage === 'inventory' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : ''}`}
-              >
-                <Package className="w-5 h-5" />
-                Inventory
-              </Button>
-            </li>
-            <li className="mb-4">
-              <Button
-                onClick={() => { setCurrentPage('reports'); setIsSidebarOpen(false); }}
-                variant="sidebar"
-                className={`w-full justify-start ${currentPage === 'reports' ? 'bg-sidebar-primary text-sidebar-primary-foreground' : ''}`}
-              >
-                <BarChart className="w-5 h-5" />
-                Reports
-              </Button>
-            </li>
-          </ul>
-        </nav>
-        <div className="absolute bottom-6 left-6 right-6">
-          <p className="text-sm text-sidebar-foreground/70 mb-2">Logged in as:</p>
-          <p className="text-base font-medium truncate text-sidebar-foreground">{user.email}</p>
-          <Button
-            onClick={signOut}
-            variant="sidebar"
-            className="mt-4 w-full justify-start bg-sidebar-accent"
-          >
-            <LogOut className="w-5 h-5" />
-            Logout
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-card transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 border-r border-border`}>
+        <div className="flex items-center justify-between h-16 px-4 border-b border-border lg:hidden">
+          <span className="text-lg font-semibold text-foreground">Menu</span>
+          <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(false)}>
+            <X className="h-6 w-6" />
           </Button>
         </div>
-      </aside>
+
+        <div className="p-4 border-b border-border">
+          <h2 className="text-lg font-semibold text-foreground">Seed Track Flow</h2>
+          <p className="text-sm text-muted-foreground">Supply Chain Management</p>
+          <div className="mt-2 flex items-center gap-2">
+            <Badge className={`text-xs ${getRoleColor()}`}>
+              {userRole && (
+                <>
+                  {(() => {
+                    const Icon = getRoleIcon();
+                    return <Icon className="h-3 w-3 mr-1" />;
+                  })()}
+                  {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
+                </>
+              )}
+            </Badge>
+          </div>
+        </div>
+
+        <nav className="mt-4 px-4">
+          <div className="space-y-2">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Button
+                  key={item.id}
+                  variant={currentPage === item.id ? "default" : "ghost"}
+                  className="w-full justify-start"
+                  onClick={() => {
+                    setCurrentPage(item.id);
+                    setSidebarOpen(false);
+                  }}
+                >
+                  <Icon className="mr-2 h-4 w-4" />
+                  {item.name}
+                </Button>
+              );
+            })}
+          </div>
+        </nav>
+
+        <div className="absolute bottom-4 left-4 right-4">
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={handleSignOut}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign Out
+          </Button>
+        </div>
+      </div>
 
       {/* Main Content */}
-      <main className="flex-1 md:ml-64 p-4">
-        {/* Mobile Header for Toggle */}
-        <header className="md:hidden flex items-center justify-between p-4 bg-card shadow-card rounded-md mb-4 border">
-          <h1 className="text-xl font-bold text-card-foreground">Oil Seed Tracker</h1>
-          <Button onClick={toggleSidebar} variant="ghost" size="icon">
-            <Menu className="w-6 h-6" />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <header className="h-16 bg-card border-b border-border flex items-center justify-between px-4 lg:hidden">
+          <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(true)}>
+            <Menu className="h-6 w-6" />
           </Button>
+          <span className="font-semibold text-foreground">Seed Track Flow</span>
+          <div></div>
         </header>
-        {renderPage()}
-      </main>
+
+        <main className="flex-1 min-h-screen">
+          {currentPage === 'dashboard' && <Dashboard userId={user.id} userRole={userRole!} />}
+          {currentPage === 'shipments' && (userRole === 'farmer' || userRole === 'administrator') && (
+            <Shipments userId={user.id} userRole={userRole} />
+          )}
+          {currentPage === 'inventory' && userRole === 'administrator' && (
+            <Inventory userId={user.id} />
+          )}
+          {currentPage === 'reports' && (
+            <EnhancedReports userId={user.id} userRole={userRole!} />
+          )}
+        </main>
+      </div>
+
+      {/* Overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        ></div>
+      )}
     </div>
   );
 };

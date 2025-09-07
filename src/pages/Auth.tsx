@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useInputValidation } from '@/hooks/useInputValidation';
+import { Shield, Wheat, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -110,10 +111,24 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">Shipment Tracker</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Seed Track Flow</h1>
           <p className="text-muted-foreground mt-2">
-            Sign in to your account or create a new one
+            Oil Seed Supply Chain Management System
           </p>
+          <div className="flex justify-center gap-4 mt-4">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Shield className="h-3 w-3" />
+              Admin
+            </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Wheat className="h-3 w-3" />
+              Farmer
+            </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Truck className="h-3 w-3" />
+              Transporter
+            </div>
+          </div>
         </div>
 
         <Tabs defaultValue="signin" className="w-full">
